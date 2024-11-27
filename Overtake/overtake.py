@@ -7,7 +7,7 @@ import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
 import \
-    cubic_spline_planner
+    CubicSplinePlanner.cubic_spline_planner as cubic_spline_planner
 
 road_width = 10  #meters
 obs_length = 5   #meters
@@ -281,6 +281,74 @@ def generate_target_course(x, y):
 
     return rx, ry, ryaw, rk, csp
     
+# def main():
+#     print(__file__ + " start!!")
+    
+#     wx = [0.0, 10.0, 20.0, 30.0, 40.0, 50.0]
+#     wy = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    
+#     tx, ty, tyaw, tc, csp = generate_target_course(wx, wy)
+    
+#  # initial state of obs vehicle
+#     obs_position = 10.0 # current position
+#     obs_vstart = 15.0 / 3.6  # current speed [m/s]
+#     obs_astart = 0.0  # current acceleration [m/ss]
+#     obs_vend = 15.0 / 3.6 #end velocity
+#     obs_aend = 0.0 #end acc
+#     c_d = 2.0  # current lateral position [m]
+#     c_d_d = 0.0  # current lateral speed [m/s]
+#     c_d_dd = 0.0  # current lateral acceleration [m/s]
+#     s0 = 0.0  # current course position
+#     area = 20.0
+
+#     for i in range(SIM_LOOP):
+        
+#         # s = obs_vstart*dt
+#         # obs_position += s
+#         obs_path = []
+#         obs_path = QuarticPolynomial(obs_position, obs_vstart, obs_astart, obs_vend, obs_aend, dt)
+#         x_t = obs_path.calc_point(dt)
+#         obs_position = x_t
+#         path = frenet_optimal_planning(csp, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, ob)
+
+#         s0 = path.s[1]
+#         c_d = path.d[1]
+#         c_d_d = path.d_d[1]
+#         c_d_dd = path.d_dd[1]
+#         c_speed = path.s_d[1]
+#         c_accel = path.s_dd[1]
+
+#         if np.hypot(path.x[1] - tx[-1], path.y[1] - ty[-1]) <= 1.0:
+#             print("Goal")
+#             break
+
+#         if show_animation:  # pragma: no cover
+#             plt.cla()
+#             plt.plot(obs_position,0, "*")
+#             # for stopping simulation with the esc key.
+#             # plt.gcf().canvas.mpl_connect(
+#             #     'key_release_event',
+#             #     lambda event: [exit(0) if event.key == 'escape' else None])
+#             plt.plot(tx, ty)
+#             # plt.plot(ob[:, 0], ob[:, 1], "xk")
+#             plt.plot(path.x[1:], path.y[1:], "-or")
+#             plt.plot(path.x[1], path.y[1], "vc")
+#             plt.xlim(path.x[1] - area, path.x[1] + area)
+#             plt.ylim(path.y[1] - area, path.y[1] + area)
+#             plt.title("v[km/h]:" + str(c_speed * 3.6)[0:4])
+#             plt.grid(True)
+#             plt.pause(0.0001)
+
+#     print("Finish")
+#     if show_animation:  # pragma: no cover
+#         plt.grid(True)
+#         plt.pause(0.0001)
+#         plt.show()
+
+
+# if __name__ == '__main__':
+#     main()
+
 def main():
     print(__file__ + " start!!")
     
@@ -289,24 +357,31 @@ def main():
     
     tx, ty, tyaw, tc, csp = generate_target_course(wx, wy)
     
- # initial state of obs vehicle
-    obs_position = 10.0 # current position
-    obs_vstart = 15.0 / 3.6  # current speed [m/s]
-    obs_astart = 0.0  # current acceleration [m/ss]
-    obs_vend = 15.0 / 3.6 #end velocity
-    obs_aend = 0.0 #end acc
-    s0 = 0.0  # current course position
+    # Initial state of the ego vehicle
+    c_speed = 0.0  # [m/s]
+    c_accel = 0.0  # [m/s^2]
+    c_d = 0.0      # [m]
+    c_d_d = 0.0    # [m/s]
+    c_d_dd = 0.0   # [m/s^2]
+    s0 = 0.0       # Current course position
+    
+    # Define static obstacles (e.g., [x, y] positions)
+    ob = np.array([[25.0, 0.0], [35.0, -1.0], [45.0, 2.0]])  # Example obstacle positions
     
     for i in range(SIM_LOOP):
-        
-        # s = obs_vstart*dt
-        # obs_position += s
-        obs_path = []
-        obs_path = QuarticPolynomial(obs_position, obs_vstart, obs_astart, obs_vend, obs_aend, dt)
-        x_t = obs_path.calc_point(dt)
-        obs_position = x_t
+        # Dynamic obstacle update (optional, example for one moving obstacle)
+        obs_position = 10.0 + i * dt * (15.0 / 3.6)  # Moving obstacle's position
+        ob[0, 0] = obs_position  # Update the first obstacle's x-coordinate
+
+        # Perform Frenet optimal planning
         path = frenet_optimal_planning(csp, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, ob)
 
+        # Ensure the path is valid
+        if path is None:
+            print("No valid path found!")
+            break
+
+        # Update Frenet state
         s0 = path.s[1]
         c_d = path.d[1]
         c_d_d = path.d_d[1]
@@ -318,29 +393,22 @@ def main():
             print("Goal")
             break
 
-        if show_animation:  # pragma: no cover
+        if show_animation:  # Visualization
             plt.cla()
-            plt.plot(obs_position,0, "*")
-            # for stopping simulation with the esc key.
-            # plt.gcf().canvas.mpl_connect(
-            #     'key_release_event',
-            #     lambda event: [exit(0) if event.key == 'escape' else None])
-            plt.plot(tx, ty)
-            # plt.plot(ob[:, 0], ob[:, 1], "xk")
-            plt.plot(path.x[1:], path.y[1:], "-or")
-            plt.plot(path.x[1], path.y[1], "vc")
-            plt.xlim(path.x[1] - area, path.x[1] + area)
-            plt.ylim(path.y[1] - area, path.y[1] + area)
-            plt.title("v[km/h]:" + str(c_speed * 3.6)[0:4])
+            plt.plot(tx, ty, "-k")  # Plot reference path
+            plt.plot(ob[:, 0], ob[:, 1], "xk")  # Plot obstacles
+            plt.plot(path.x[1:], path.y[1:], "-or")  # Plot planned path
+            plt.plot(path.x[1], path.y[1], "vc")  # Current position
+            plt.xlim(path.x[1] - 20, path.x[1] + 20)  # Set plot range
+            plt.ylim(path.y[1] - 20, path.y[1] + 20)
+            plt.title("Speed [km/h]:" + str(c_speed * 3.6)[0:4])
             plt.grid(True)
-            plt.pause(0.0001)
+            plt.pause(0.001)
 
     print("Finish")
-    if show_animation:  # pragma: no cover
+    if show_animation:
         plt.grid(True)
-        plt.pause(0.0001)
         plt.show()
-
-
+        
 if __name__ == '__main__':
     main()
